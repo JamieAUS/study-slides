@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CNS Summary Slide — Location + Arterial Supply + Causal Arrows</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --background: #f8fafc;
+      --foreground: #0f172a;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-foreground: #ffffff;
+      --secondary: #e2e8f0;
+      --secondary-foreground: #1e293b;
+      --muted-foreground: #64748b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0f172a;
+        --foreground: #f1f5f9;
+        --card: #1e293b;
+        --border: #334155;
+        --primary: #3b82f6;
+        --primary-foreground: #ffffff;
+        --secondary: #334155;
+        --secondary-foreground: #f1f5f9;
+        --muted-foreground: #94a3b8;
+      }
+    }
+    .brain-region {
+      cursor: pointer;
+      transition: opacity 0.2s ease, filter 0.2s ease, stroke-width 0.2s ease;
+    }
+    .brain-region:hover {
+      filter: brightness(1.12);
+    }
+    .brain-region.dimmed {
+      opacity: 0.22;
+    }
+    .brain-region.selected {
+      stroke-width: 3px;
+      filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.45));
+    }
+    .blur-recall {
+      filter: blur(5px);
+      user-select: none;
+      cursor: pointer;
+      transition: filter 0.15s ease;
+    }
+    .blur-recall.revealed {
+      filter: none;
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 md:p-6 m-0">
+  <div class="max-w-7xl mx-auto space-y-4">
+
+    <!-- Slide Header -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-3 border-b border-[var(--border)]">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 text-xs font-semibold rounded bg-[var(--primary)] text-[var(--primary-foreground)]">PHTY2030</span>
+          <h1 class="text-lg font-bold tracking-tight">CNS Summary Sheet: Location × Arterial Supply × Causal Arrows</h1>
+        </div>
+        <p class="text-xs text-[var(--muted-foreground)] mt-1">
+          Click any brain region or artery filter to connect <strong>where it sits</strong> → <strong>what feeds it</strong> → <strong>Normal Role → Deficit</strong>.
+        </p>
+      </div>
+
+      <!-- Active Recall & Shuffle Controls -->
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <button id="btn-hide-supply" class="px-2.5 py-1.5 rounded border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] font-medium transition">
+          Hide Supply
+        </button>
+        <button id="btn-hide-deficits" class="px-2.5 py-1.5 rounded border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] font-medium transition">
+          Hide Deficits
+        </button>
+        <button id="btn-shuffle" class="px-2.5 py-1.5 rounded border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] font-medium transition">
+          Shuffle Cards
+        </button>
+        <button id="btn-reset" class="px-2.5 py-1.5 rounded bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:opacity-90 font-medium transition">
+          Show All
+        </button>
+      </div>
+    </div>
+
+    <!-- Artery Filter Bar -->
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      <span class="text-[var(--muted-foreground)] font-medium mr-1">Arterial Territory:</span>
+      <button data-artery="ALL" class="artery-btn px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--primary)] text-[var(--primary-foreground)] font-medium">All</button>
+      <button data-artery="ACA" class="artery-btn px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--card)] font-medium flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#ef4444"></span> ACA (Medial/Sup → LL)
+      </button>
+      <button data-artery="MCA" class="artery-btn px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--card)] font-medium flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#3b82f6"></span> MCA (Lateral → UL/Face, Language)
+      </button>
+      <button data-artery="PCA" class="artery-btn px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--card)] font-medium flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#10b981"></span> PCA (Occipital, Med Temporal, Thalamus)
+      </button>
+      <button data-artery="POST" class="artery-btn px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--card)] font-medium flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#f59e0b"></span> Posterior Circ (Vert/Basilar)
+      </button>
+      <button data-artery="DEEP" class="artery-btn px-2.5 py-1 rounded-full border border-[var(--border)] bg-[var(--card)] font-medium flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#8b5cf6"></span> Deep MCA/ACA &amp; CoW
+      </button>
+    </div>
+
+    <!-- Main 2-Column Slide Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+      <!-- LEFT: Anatomical Diagrams (5 cols) -->
+      <div class="lg:col-span-5 space-y-4">
+
+        <!-- View 1: Lateral Brain + Posterior -->
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">1. Lateral View (Surface Lobes + Posterior)</h2>
+            <span class="text-xs text-[var(--muted-foreground)]">Click region</span>
+          </div>
+          <svg viewBox="0 0 420 290" class="w-full h-auto select-none">
+            <!-- ACA Superior Rim Indicator -->
+            <path d="M 55 110 C 65 45, 145 20, 235 25 C 285 28, 325 48, 345 72"
+                  fill="none" stroke="#ef4444" stroke-width="5" stroke-dasharray="6 3" opacity="0.75"/>
+            <text x="195" y="16" font-size="10" font-weight="700" fill="#ef4444" text-anchor="middle">ACA Rim (Superior / Medial)</text>
+
+            <!-- Frontal Lobe (Lateral) -->
+            <path id="svg-frontal" data-id="frontal" class="brain-region"
+                  d="M 55 128 C 48 80, 90 32, 165 28 L 195 28 L 185 135 L 125 142 C 95 145, 62 145, 55 128 Z"
+                  fill="#3b82f6" fill-opacity="0.28" stroke="#3b82f6" stroke-width="2"/>
+            <text x="122" y="78" font-size="12" font-weight="700" fill="currentColor" text-anchor="middle">Frontal</text>
+            <text x="122" y="93" font-size="9.5" fill="currentColor" opacity="0.8" text-anchor="middle">Motor, Exec</text>
+            <!-- Broca's marker -->
+            <circle cx="145" cy="122" r="11" fill="#3b82f6" fill-opacity="0.55" stroke="#1d4ed8" stroke-width="1.5"/>
+            <text x="145" y="125" font-size="8.5" font-weight="700" fill="#ffffff" text-anchor="middle">Broca</text>
+
+            <!-- Parietal Lobe (Lateral) -->
+            <path id="svg-parietal" data-id="parietal" class="brain-region"
+                  d="M 195 28 L 285 38 C 312 46, 332 68, 340 96 L 265 135 L 185 135 Z"
+                  fill="#60a5fa" fill-opacity="0.28" stroke="#2563eb" stroke-width="2"/>
+            <text x="255" y="76" font-size="12" font-weight="700" fill="currentColor" text-anchor="middle">Parietal</text>
+            <text x="255" y="91" font-size="9.5" fill="currentColor" opacity="0.8" text-anchor="middle">Sensory, Spatial</text>
+
+            <!-- Occipital Lobe -->
+            <path id="svg-occipital" data-id="occipital" class="brain-region"
+                  d="M 340 96 C 364 115, 368 152, 344 178 L 292 174 L 285 135 Z"
+                  fill="#10b981" fill-opacity="0.32" stroke="#059669" stroke-width="2"/>
+            <text x="330" y="142" font-size="11.5" font-weight="700" fill="currentColor" text-anchor="middle">Occipital</text>
+            <text x="330" y="156" font-size="9" fill="currentColor" opacity="0.85" text-anchor="middle">PCA • Vision</text>
+
+            <!-- Temporal Lobe -->
+            <path id="svg-temporal" data-id="temporal" class="brain-region"
+                  d="M 125 142 L 285 135 L 292 174 C 255 190, 175 196, 130 176 C 115 168, 112 150, 125 142 Z"
+                  fill="#3b82f6" fill-opacity="0.22" stroke="#10b981" stroke-width="2" stroke-dasharray="5 2"/>
+            <text x="195" y="164" font-size="12" font-weight="700" fill="currentColor" text-anchor="middle">Temporal</text>
+            <text x="195" y="178" font-size="9" fill="currentColor" opacity="0.8" text-anchor="middle">Lat: MCA | Med: PCA</text>
+            <!-- Wernicke's marker -->
+            <circle cx="262" cy="148" r="11" fill="#3b82f6" fill-opacity="0.55" stroke="#1d4ed8" stroke-width="1.5"/>
+            <text x="262" y="151" font-size="7.5" font-weight="700" fill="#ffffff" text-anchor="middle">Wern</text>
+
+            <!-- Cerebellum -->
+            <path id="svg-cerebellum" data-id="cerebellum" class="brain-region"
+                  d="M 255 184 C 295 176, 336 184, 338 214 C 340 238, 305 248, 265 240 C 250 235, 245 195, 255 184 Z"
+                  fill="#f59e0b" fill-opacity="0.32" stroke="#d97706" stroke-width="2"/>
+            <text x="294" y="212" font-size="11" font-weight="700" fill="currentColor" text-anchor="middle">Cerebellum</text>
+            <text x="294" y="226" font-size="8.5" fill="currentColor" opacity="0.85" text-anchor="middle">Post Circ (Ipsilat)</text>
+
+            <!-- Brainstem -->
+            <path id="svg-brainstem" data-id="brainstem" class="brain-region"
+                  d="M 210 185 L 248 185 L 245 274 L 218 274 C 216 245, 206 212, 210 185 Z"
+                  fill="#f59e0b" fill-opacity="0.24" stroke="#b45309" stroke-width="2"/>
+            <text x="229" y="232" font-size="10" font-weight="700" fill="currentColor" text-anchor="middle" transform="rotate(-90 229 232)">Brainstem</text>
+          </svg>
+        </div>
+
+        <!-- View 2: Medial & Deep Hubs -->
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">2. Medial &amp; Deep Hubs (ACA / Deep / Thalamus)</h2>
+            <span class="text-xs text-[var(--muted-foreground)]">Click structure</span>
+          </div>
+          <svg viewBox="0 0 420 210" class="w-full h-auto select-none">
+            <!-- Medial ACA territory (Frontal + Parietal medial) -->
+            <path id="svg-aca-medial" data-id="frontal" class="brain-region"
+                  d="M 55 110 C 58 45, 130 18, 235 20 C 265 22, 285 32, 295 45 L 255 82 C 215 74, 155 76, 118 106 Z"
+                  fill="#ef4444" fill-opacity="0.25" stroke="#ef4444" stroke-width="2"/>
+            <text x="178" y="52" font-size="11" font-weight="700" fill="#ef4444" text-anchor="middle">Medial Frontal / Parietal = ACA</text>
+            <text x="178" y="67" font-size="9.5" fill="currentColor" opacity="0.85" text-anchor="middle">Contralateral Lower Limb (LL)</text>
+
+            <!-- Basal Ganglia -->
+            <ellipse id="svg-basal" data-id="basal_ganglia" class="brain-region"
+                     cx="138" cy="136" rx="44" ry="26"
+                     fill="#8b5cf6" fill-opacity="0.28" stroke="#7c3aed" stroke-width="2"/>
+            <text x="138" y="133" font-size="11" font-weight="700" fill="currentColor" text-anchor="middle">Basal ganglia</text>
+            <text x="138" y="147" font-size="8.5" fill="currentColor" opacity="0.85" text-anchor="middle">Deep MCA / ACA</text>
+
+            <!-- Thalamus -->
+            <ellipse id="svg-thalamus" data-id="thalamus" class="brain-region"
+                     cx="245" cy="120" rx="38" ry="22"
+                     fill="#10b981" fill-opacity="0.28" stroke="#059669" stroke-width="2"/>
+            <text x="245" y="117" font-size="11" font-weight="700" fill="currentColor" text-anchor="middle">Thalamus</text>
+            <text x="245" y="131" font-size="8.5" fill="currentColor" opacity="0.85" text-anchor="middle">PCA • Relay</text>
+
+            <!-- Hypothalamus -->
+            <path id="svg-hypothalamus" data-id="hypothalamus" class="brain-region"
+                  d="M 205 144 L 255 144 L 235 178 L 210 172 Z"
+                  fill="#8b5cf6" fill-opacity="0.28" stroke="#6d28d9" stroke-width="2"/>
+            <text x="228" y="161" font-size="9.5" font-weight="700" fill="currentColor" text-anchor="middle">Hypothal</text>
+            <text x="228" y="190" font-size="8.5" fill="currentColor" opacity="0.8" text-anchor="middle">Circle of Willis</text>
+
+            <!-- Medial Occipital / Hippocampus PCA -->
+            <path id="svg-pca-medial" data-id="occipital" class="brain-region"
+                  d="M 295 45 C 348 65, 368 115, 345 155 L 292 145 L 285 92 Z"
+                  fill="#10b981" fill-opacity="0.22" stroke="#10b981" stroke-width="2"/>
+            <text x="325" y="108" font-size="10.5" font-weight="700" fill="#059669" text-anchor="middle">PCA</text>
+            <text x="325" y="122" font-size="8.5" fill="currentColor" opacity="0.8" text-anchor="middle">Occipital +</text>
+            <text x="325" y="133" font-size="8.5" fill="currentColor" opacity="0.8" text-anchor="middle">Hippocampus</text>
+          </svg>
+        </div>
+
+        <!-- Quick Legend / Memory Hook -->
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-lg p-3 text-xs space-y-1.5">
+          <div class="font-semibold text-[var(--foreground)]">Compression Rule (1-Glance Pattern)</div>
+          <ul class="space-y-1 text-[var(--muted-foreground)] list-disc pl-4">
+            <li><strong>Medial/Superior</strong> = <span class="text-[#ef4444] font-semibold">ACA</span> (Lower Limb)</li>
+            <li><strong>Lateral Convexity</strong> = <span class="text-[#3b82f6] font-semibold">MCA</span> (UL/Face, Broca/Wernicke, Neglect)</li>
+            <li><strong>Posterior / Inferior</strong> = <span class="text-[#10b981] font-semibold">PCA</span> (Vision, Memory/Hippocampus, Thalamus)</li>
+            <li><strong>Posterior Fossa</strong> = <span class="text-[#f59e0b] font-semibold">Vert/Basilar</span> (Cerebellum, Brainstem)</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- RIGHT: Causal Arrow Cards (7 cols) -->
+      <div class="lg:col-span-7">
+        <div id="cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const DATA = [
+      {
+        id: "frontal",
+        group: "Cerebral Lobes",
+        area: "Frontal lobe",
+        arteries: ["ACA", "MCA"],
+        supplyText: "Medial / Superior: ACA • Lateral: MCA",
+        color: "#3b82f6",
+        pairs: [
+          {
+            role: "Primary motor cortex",
+            deficit: "Contralateral hemiparesis / hemiplegia (ACA = LL, MCA = UL/Face)"
+          },
+          {
+            role: "Motor planning, Broca's area",
+            deficit: "Apraxia, Broca's (expressive) aphasia (MCA)"
+          },
+          {
+            role: "Executive function, personality / behaviour",
+            deficit: "Executive dysfunction, personality / behavioural changes"
+          }
+        ]
+      },
+      {
+        id: "parietal",
+        group: "Cerebral Lobes",
+        area: "Parietal lobe",
+        arteries: ["ACA", "MCA"],
+        supplyText: "Medial / Superior: ACA • Lateral: MCA",
+        color: "#2563eb",
+        pairs: [
+          {
+            role: "Primary sensory cortex",
+            deficit: "Contralateral sensory loss (ACA = LL, MCA = UL/Face)"
+          },
+          {
+            role: "Spatial awareness, body schema",
+            deficit: "Unilateral spatial neglect (mostly right parietal, MCA), astereognosis, spatial disorientation"
+          }
+        ]
+      },
+      {
+        id: "temporal",
+        group: "Cerebral Lobes",
+        area: "Temporal lobe",
+        arteries: ["MCA", "PCA"],
+        supplyText: "Lateral: MCA • Medial: PCA",
+        color: "#0ea5e9",
+        pairs: [
+          {
+            role: "Auditory processing",
+            deficit: "Hearing / visual field deficits (upper quadrant)"
+          },
+          {
+            role: "Wernicke's area (MCA)",
+            deficit: "Wernicke's (receptive) aphasia"
+          },
+          {
+            role: "Memory (Hippocampus, PCA)",
+            deficit: "Memory impairment"
+          }
+        ]
+      },
+      {
+        id: "occipital",
+        group: "Cerebral Lobes",
+        area: "Occipital lobe",
+        arteries: ["PCA"],
+        supplyText: "PCA",
+        color: "#10b981",
+        pairs: [
+          {
+            role: "Visual processing (Primary visual cortex)",
+            deficit: "Contralateral homonymous hemianopia, visual agnosia, cortical blindness"
+          }
+        ]
+      },
+      {
+        id: "cerebellum",
+        group: "Movement Modulators",
+        area: "Cerebellum",
+        arteries: ["POST"],
+        supplyText: "Posterior circulation (Vertebral / Basilar arteries)",
+        color: "#f59e0b",
+        pairs: [
+          {
+            role: "Coordination, balance, posture, smooth & accurate movement, motor learning",
+            deficit: "Ataxia (limb/gait), dysmetria, dysdiadochokinesia, intention tremor, nystagmus, dysarthria (mostly ipsilateral)"
+          }
+        ]
+      },
+      {
+        id: "basal_ganglia",
+        group: "Movement Modulators",
+        area: "Basal ganglia",
+        arteries: ["DEEP"],
+        supplyText: "Deep branches of MCA / ACA",
+        color: "#8b5cf6",
+        pairs: [
+          {
+            role: "Movement initiation & amplitude scaling",
+            deficit: "Bradykinesia / akinesia"
+          },
+          {
+            role: "Suppressing unwanted movement, postural tone",
+            deficit: "Rigidity, resting tremor, chorea / dystonia, postural instability"
+          }
+        ]
+      },
+      {
+        id: "brainstem",
+        group: "Deep Hubs",
+        area: "Brainstem",
+        arteries: ["POST"],
+        supplyText: "Posterior circulation (Vertebral → Basilar artery)",
+        color: "#d97706",
+        pairs: [
+          {
+            role: "Cranial nerve nuclei",
+            deficit: "Cranial nerve palsies (diplopia, dysphagia, dysarthria, facial weakness), vertigo, nausea, nystagmus"
+          },
+          {
+            role: "Consciousness (RAS) & vital autonomic control (respiration, HR, BP)",
+            deficit: "Altered consciousness, respiratory / cardiac instability"
+          },
+          {
+            role: "Highway for ascending / descending tracts",
+            deficit: "Ascending / descending tract deficits"
+          }
+        ]
+      },
+      {
+        id: "thalamus",
+        group: "Deep Hubs",
+        area: "Thalamus",
+        arteries: ["PCA"],
+        supplyText: "PCA",
+        color: "#059669",
+        pairs: [
+          {
+            role: "Main sensory relay station to cortex (except smell)",
+            deficit: "Contralateral hemisensory loss"
+          },
+          {
+            role: "Pain & arousal modulation",
+            deficit: "Thalamic pain syndrome (central post-stroke pain)"
+          }
+        ]
+      },
+      {
+        id: "hypothalamus",
+        group: "Deep Hubs",
+        area: "Hypothalamus",
+        arteries: ["DEEP"],
+        supplyText: "Circle of Willis branches",
+        color: "#6d28d9",
+        pairs: [
+          {
+            role: "Homeostasis (temp, thirst, hunger, sleep)",
+            deficit: "Thermoregulation dysfunction, sleep-wake disturbance"
+          },
+          {
+            role: "Autonomic & endocrine (pituitary) control",
+            deficit: "Autonomic / endocrine imbalances"
+          }
+        ]
+      }
+    ];
+
+    let state = {
+      selectedId: null,
+      artery: "ALL",
+      hideSupply: false,
+      hideDeficits: false,
+      order: DATA.map((_, i) => i)
+    };
+
+    const cardsContainer = document.getElementById("cards-container");
+
+    function render() {
+      // Update SVG regions
+      document.querySelectorAll(".brain-region").forEach(el => {
+        const id = el.dataset.id;
+        const item = DATA.find(d => d.id === id);
+        const matchesArtery = state.artery === "ALL" || (item && item.arteries.includes(state.artery));
+        const matchesSelected = !state.selectedId || state.selectedId === id;
+
+        el.classList.toggle("dimmed", !(matchesArtery && matchesSelected));
+        el.classList.toggle("selected", state.selectedId === id);
+      });
+
+      // Update Artery filter buttons
+      document.querySelectorAll(".artery-btn").forEach(btn => {
+        const active = btn.dataset.artery === state.artery;
+        btn.classList.toggle("bg-[var(--primary)]", active);
+        btn.classList.toggle("text-[var(--primary-foreground)]", active);
+        btn.classList.toggle("bg-[var(--card)]", !active);
+      });
+
+      // Update Recall buttons
+      const btnSupply = document.getElementById("btn-hide-supply");
+      btnSupply.classList.toggle("bg-[var(--primary)]", state.hideSupply);
+      btnSupply.classList.toggle("text-[var(--primary-foreground)]", state.hideSupply);
+
+      const btnDef = document.getElementById("btn-hide-deficits");
+      btnDef.classList.toggle("bg-[var(--primary)]", state.hideDeficits);
+      btnDef.classList.toggle("text-[var(--primary-foreground)]", state.hideDeficits);
+
+      // Render Cards
+      cardsContainer.innerHTML = "";
+      state.order.forEach(idx => {
+        const item = DATA[idx];
+        const matchesArtery = state.artery === "ALL" || item.arteries.includes(state.artery);
+        const matchesSelected = !state.selectedId || state.selectedId === item.id;
+        if (!matchesArtery || !matchesSelected) return;
+
+        const card = document.createElement("div");
+        card.className = "bg-[var(--card)] border border-[var(--border)] rounded-lg p-3 space-y-2 shadow-sm";
+        card.style.borderTopWidth = "3px";
+        card.style.borderTopColor = item.color;
+
+        const supplyBlurClass = state.hideSupply ? "blur-recall" : "";
+        const deficitBlurClass = state.hideDeficits ? "blur-recall" : "";
+
+        const pairsHtml = item.pairs.map(p => `
+          <div class="grid grid-cols-12 gap-1.5 items-start text-xs py-1.5 border-t border-[var(--border)]">
+            <div class="col-span-5 font-medium text-[var(--foreground)] leading-snug">${p.role}</div>
+            <div class="col-span-1 text-center font-bold text-[var(--muted-foreground)]">→</div>
+            <div class="col-span-6 text-[var(--foreground)] leading-snug ${deficitBlurClass}" onclick="this.classList.toggle('revealed')">${p.deficit}</div>
+          </div>
+        `).join("");
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)] font-medium">${item.group}</span>
+              <h3 class="text-sm font-bold text-[var(--foreground)]">${item.area}</h3>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded bg-[var(--secondary)] text-[var(--secondary-foreground)] font-medium text-right ${supplyBlurClass}" onclick="this.classList.toggle('revealed')">
+              ${item.supplyText}
+            </span>
+          </div>
+          <div>${pairsHtml}</div>
+        `;
+        cardsContainer.appendChild(card);
+      });
+    }
+
+    // Event listeners
+    document.querySelectorAll(".brain-region").forEach(el => {
+      el.addEventListener("click", () => {
+        const id = el.dataset.id;
+        state.selectedId = (state.selectedId === id) ? null : id;
+        render();
+      });
+    });
+
+    document.querySelectorAll(".artery-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.artery = btn.dataset.artery;
+        state.selectedId = null;
+        render();
+      });
+    });
+
+    document.getElementById("btn-hide-supply").addEventListener("click", () => {
+      state.hideSupply = !state.hideSupply;
+      render();
+    });
+
+    document.getElementById("btn-hide-deficits").addEventListener("click", () => {
+      state.hideDeficits = !state.hideDeficits;
+      render();
+    });
+
+    document.getElementById("btn-shuffle").addEventListener("click", () => {
+      for (let i = state.order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [state.order[i], state.order[j]] = [state.order[j], state.order[i]];
+      }
+      render();
+    });
+
+    document.getElementById("btn-reset").addEventListener("click", () => {
+      state.selectedId = null;
+      state.artery = "ALL";
+      state.hideSupply = false;
+      state.hideDeficits = false;
+      state.order = DATA.map((_, i) => i);
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>

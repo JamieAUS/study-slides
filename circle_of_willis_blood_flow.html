@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Circle of Willis &amp; Cerebral Blood Flow — PHTY2030</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --ant: #ef4444;
+    --ant-glow: rgba(239, 68, 68, 0.35);
+    --post: #38bdf8;
+    --post-glow: rgba(56, 189, 248, 0.35);
+    --comm: #f59e0b;
+    --dead: #475569;
+    --accent: #22d3ee;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 14px 24px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  header p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  button {
+    background: #334155;
+    color: var(--text);
+    border: 1px solid #475569;
+    padding: 7px 13px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  button:hover { background: #475569; }
+  button.active {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #fff;
+  }
+  button.danger.active {
+    background: #dc2626;
+    border-color: #f87171;
+  }
+  .speed-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .main {
+    display: grid;
+    grid-template-columns: 1.35fr 0.95fr;
+    gap: 18px;
+    padding: 18px 24px;
+    flex: 1;
+    max-width: 1440px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  @media (max-width: 980px) {
+    .main { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 0.8rem;
+    margin-bottom: 10px;
+    color: var(--muted);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .svg-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0b1220;
+    border-radius: 10px;
+    border: 1px solid #1e293b;
+    overflow: hidden;
+    position: relative;
+  }
+  svg {
+    width: 100%;
+    height: auto;
+    max-height: 76vh;
+    user-select: none;
+  }
+  .vessel-base {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke 0.25s ease, opacity 0.25s ease;
+  }
+  .vessel-ant { stroke: #7f1d1d; }
+  .vessel-post { stroke: #0c4a6e; }
+  .vessel-comm { stroke: #78350f; }
+  .vessel-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 22;
+    cursor: pointer;
+  }
+  .vessel-hit:hover + .vessel-base,
+  .vessel-base.hovered {
+    filter: brightness(1.45);
+  }
+  .occluded {
+    stroke: var(--dead) !important;
+    opacity: 0.45;
+  }
+  .label-txt {
+    fill: #e2e8f0;
+    font-size: 11.5px;
+    font-weight: 600;
+    pointer-events: none;
+  }
+  .label-sub {
+    fill: #94a3b8;
+    font-size: 10px;
+    pointer-events: none;
+  }
+  .territory-box {
+    fill: rgba(15, 23, 42, 0.82);
+    stroke: #334155;
+    stroke-width: 1.2;
+    rx: 8;
+  }
+  .territory-box.starved {
+    fill: rgba(127, 29, 29, 0.35);
+    stroke: #ef4444;
+  }
+  .info-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .plumbing-bar {
+    background: #0b1220;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .plumbing-bar strong { color: #f8fafc; }
+  .tag-ant {
+    display: inline-block;
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .tag-post {
+    display: inline-block;
+    background: rgba(56, 189, 248, 0.2);
+    color: #7dd3fc;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .tag-comm {
+    display: inline-block;
+    background: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .status-card {
+    background: #0b1220;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .status-card h2 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    color: #38bdf8;
+  }
+  .status-card.alert h2 { color: #f87171; }
+  .status-card ul {
+    padding-left: 18px;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    color: #cbd5e1;
+  }
+  .status-card li + li { margin-top: 4px; }
+  .occlusion-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .occlusion-btns button {
+    font-size: 0.78rem;
+    padding: 5px 10px;
+  }
+  .hint {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Cerebral Blood Flow &amp; Circle of Willis (PHTY2030 W1 L1)</h1>
+    <p>Watch where blood enters (ICA 80% vs Vertebral 20%), communicates in the Circle of Willis, and exits to each lobe.</p>
+  </div>
+  <div class="controls">
+    <button id="btn-normal" class="active">Normal Flow</button>
+    <button id="btn-embolus" class="danger">Embolus → L MCA (Most Common)</button>
+    <button id="btn-pause">Pause</button>
+    <div class="speed-box">
+      <span>Speed</span>
+      <input id="speed" type="range" min="0.4" max="2.2" step="0.2" value="1" />
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="card">
+    <div class="legend">
+      <div class="legend-item"><span class="dot" style="background: var(--ant)"></span> Anterior Circulation (ICA 80% → ACA &amp; MCA)</div>
+      <div class="legend-item"><span class="dot" style="background: var(--post)"></span> Posterior Circulation (Vertebral 20% → Basilar → PCA)</div>
+      <div class="legend-item"><span class="dot" style="background: var(--comm)"></span> Communicating Arteries (AComA / PComA)</div>
+    </div>
+
+    <div class="svg-wrap">
+      <svg viewBox="0 0 760 660" id="flow-svg">
+        <defs>
+          <filter id="glow-red" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Territory Output Boxes -->
+        <g id="terr-l-aca">
+          <rect class="territory-box" x="180" y="16" width="185" height="58" />
+          <text class="label-txt" x="272" y="36" text-anchor="middle">L ACA Territory</text>
+          <text class="label-sub" x="272" y="52" text-anchor="middle">Medial Frontal/Parietal</text>
+          <text class="label-sub" x="272" y="65" text-anchor="middle">→ R Lower Limb &amp; Foot</text>
+        </g>
+        <g id="terr-r-aca">
+          <rect class="territory-box" x="395" y="16" width="185" height="58" />
+          <text class="label-txt" x="487" y="36" text-anchor="middle">R ACA Territory</text>
+          <text class="label-sub" x="487" y="52" text-anchor="middle">Medial Frontal/Parietal</text>
+          <text class="label-sub" x="487" y="65" text-anchor="middle">→ L Lower Limb &amp; Foot</text>
+        </g>
+
+        <g id="terr-l-mca">
+          <rect class="territory-box" x="14" y="155" width="165" height="72" />
+          <text class="label-txt" x="96" y="176" text-anchor="middle">L MCA Territory</text>
+          <text class="label-sub" x="96" y="192" text-anchor="middle">Lateral Frontal/Parietal/Temp</text>
+          <text class="label-sub" x="96" y="206" text-anchor="middle">→ R Face/UL + Aphasia</text>
+          <text class="label-sub" x="96" y="219" text-anchor="middle">(Broca's / Wernicke's)</text>
+        </g>
+        <g id="terr-r-mca">
+          <rect class="territory-box" x="581" y="155" width="165" height="72" />
+          <text class="label-txt" x="663" y="176" text-anchor="middle">R MCA Territory</text>
+          <text class="label-sub" x="663" y="192" text-anchor="middle">Lateral Frontal/Parietal/Temp</text>
+          <text class="label-sub" x="663" y="206" text-anchor="middle">→ L Face/UL + Neglect</text>
+          <text class="label-sub" x="663" y="219" text-anchor="middle">(Spatial Neglect)</text>
+        </g>
+
+        <g id="terr-l-pca">
+          <rect class="territory-box" x="18" y="340" width="162" height="58" />
+          <text class="label-txt" x="99" y="360" text-anchor="middle">L PCA Territory</text>
+          <text class="label-sub" x="99" y="376" text-anchor="middle">Occipital, Thalamus, Med Temp</text>
+          <text class="label-sub" x="99" y="389" text-anchor="middle">→ R Hemianopia / Sensory</text>
+        </g>
+        <g id="terr-r-pca">
+          <rect class="territory-box" x="580" y="340" width="162" height="58" />
+          <text class="label-txt" x="661" y="360" text-anchor="middle">R PCA Territory</text>
+          <text class="label-sub" x="661" y="376" text-anchor="middle">Occipital, Thalamus, Med Temp</text>
+          <text class="label-sub" x="661" y="389" text-anchor="middle">→ L Hemianopia / Sensory</text>
+        </g>
+
+        <g id="terr-post-fossa">
+          <rect class="territory-box" x="530" y="470" width="210" height="58" />
+          <text class="label-txt" x="635" y="490" text-anchor="middle">Brainstem &amp; Cerebellum</text>
+          <text class="label-sub" x="635" y="506" text-anchor="middle">PICA, AICA, Pontine, SCA</text>
+          <text class="label-sub" x="635" y="519" text-anchor="middle">→ CN Palsies, Vertigo, Ataxia</text>
+        </g>
+
+        <!-- Center Circle of Willis label -->
+        <text x="380" y="220" text-anchor="middle" fill="#64748b" font-size="15" font-weight="800" letter-spacing="1.5">CIRCLE OF</text>
+        <text x="380" y="240" text-anchor="middle" fill="#64748b" font-size="18" font-weight="800" letter-spacing="1.5">WILLIS</text>
+
+        <!-- VESSEL PATHS -->
+        <!-- Posterior: Vertebral Arteries -->
+        <path id="v-l-vert" data-key="l-vert" class="vessel-base vessel-post" stroke-width="11"
+              d="M 270 630 C 280 570, 325 510, 380 465" />
+        <path id="v-r-vert" data-key="r-vert" class="vessel-base vessel-post" stroke-width="11"
+              d="M 490 630 C 480 570, 435 510, 380 465" />
+
+        <!-- Basilar Artery -->
+        <path id="v-basilar" data-key="basilar" class="vessel-base vessel-post" stroke-width="14"
+              d="M 380 465 L 380 315" />
+
+        <!-- Cerebellar & Pontine Branches (visual) -->
+        <path id="v-l-pica" class="vessel-base vessel-post" stroke-width="4.5" d="M 308 552 C 265 552, 235 562, 205 572" />
+        <path id="v-r-pica" class="vessel-base vessel-post" stroke-width="4.5" d="M 452 552 C 495 552, 525 562, 555 572" />
+        <path id="v-l-aica" class="vessel-base vessel-post" stroke-width="4.5" d="M 380 440 C 325 440, 275 445, 235 456" />
+        <path id="v-r-aica" class="vessel-base vessel-post" stroke-width="4.5" d="M 380 440 C 435 440, 485 445, 525 456" />
+        <path class="vessel-base vessel-post" stroke-width="3" d="M 380 412 L 332 410 M 380 392 L 332 390 M 380 372 L 332 370" />
+        <path class="vessel-base vessel-post" stroke-width="3" d="M 380 412 L 428 410 M 380 392 L 428 390 M 380 372 L 428 370" />
+        <path id="v-l-sca" class="vessel-base vessel-post" stroke-width="5" d="M 380 338 C 315 335, 255 348, 215 390" />
+        <path id="v-r-sca" class="vessel-base vessel-post" stroke-width="5" d="M 380 338 C 445 335, 505 348, 545 390" />
+
+        <!-- PCA -->
+        <path id="v-l-pca" data-key="l-pca" class="vessel-base vessel-post" stroke-width="9"
+              d="M 380 315 C 320 315, 250 328, 185 362" />
+        <path id="v-r-pca" data-key="r-pca" class="vessel-base vessel-post" stroke-width="9"
+              d="M 380 315 C 440 315, 510 328, 575 362" />
+
+        <!-- PComA (bridges ICA <-> PCA) -->
+        <path id="v-l-pcom" data-key="l-pcom" class="vessel-base vessel-comm" stroke-width="5.5"
+              d="M 272 215 C 276 260, 295 295, 326 318" />
+        <path id="v-r-pcom" data-key="r-pcom" class="vessel-base vessel-comm" stroke-width="5.5"
+              d="M 488 215 C 484 260, 465 295, 434 318" />
+
+        <!-- Anterior: ICA Inlets -->
+        <path id="v-l-ica" data-key="l-ica" class="vessel-base vessel-ant" stroke-width="16"
+              d="M 255 255 L 272 215" />
+        <path id="v-r-ica" data-key="r-ica" class="vessel-base vessel-ant" stroke-width="16"
+              d="M 505 255 L 488 215" />
+
+        <!-- MCA (huge lateral outflow) -->
+        <path id="v-l-mca" data-key="l-mca" class="vessel-base vessel-ant" stroke-width="13"
+              d="M 272 215 C 242 195, 215 188, 182 188" />
+        <path id="v-r-mca" data-key="r-mca" class="vessel-base vessel-ant" stroke-width="13"
+              d="M 488 215 C 518 195, 545 188, 578 188" />
+
+        <!-- ACA (medial & upward outflow) -->
+        <path id="v-l-aca" data-key="l-aca" class="vessel-base vessel-ant" stroke-width="8.5"
+              d="M 272 215 C 288 170, 322 145, 355 135 C 355 110, 345 92, 330 78" />
+        <path id="v-r-aca" data-key="r-aca" class="vessel-base vessel-ant" stroke-width="8.5"
+              d="M 488 215 C 472 170, 438 145, 405 135 C 405 110, 415 92, 430 78" />
+
+        <!-- AComA (bridges L ACA <-> R ACA) -->
+        <path id="v-acom" data-key="acom" class="vessel-base vessel-comm" stroke-width="6"
+              d="M 355 135 L 405 135" />
+
+        <!-- Inlet Rings for ICA & Vertebral -->
+        <circle cx="255" cy="255" r="13" fill="#ef4444" stroke="#fecaca" stroke-width="2.5" />
+        <text x="255" y="284" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700">L ICA INLET</text>
+        <text x="255" y="297" text-anchor="middle" fill="#94a3b8" font-size="9.5">(40%)</text>
+
+        <circle cx="505" cy="255" r="13" fill="#ef4444" stroke="#fecaca" stroke-width="2.5" />
+        <text x="505" y="284" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700">R ICA INLET</text>
+        <text x="505" y="297" text-anchor="middle" fill="#94a3b8" font-size="9.5">(40%)</text>
+
+        <circle cx="270" cy="630" r="10" fill="#38bdf8" stroke="#bae6fd" stroke-width="2" />
+        <text x="220" y="634" text-anchor="end" fill="#7dd3fc" font-size="11" font-weight="700">L Vertebral (10%)</text>
+
+        <circle cx="490" cy="630" r="10" fill="#38bdf8" stroke="#bae6fd" stroke-width="2" />
+        <text x="540" y="634" text-anchor="start" fill="#7dd3fc" font-size="11" font-weight="700">R Vertebral (10%)</text>
+
+        <!-- Vessel Labels -->
+        <text class="label-txt" x="380" y="122" text-anchor="middle" fill="#fcd34d">AComA</text>
+        <text class="label-txt" x="312" y="138" text-anchor="end">L ACA</text>
+        <text class="label-txt" x="448" y="138" text-anchor="start">R ACA</text>
+        <text class="label-txt" x="225" y="176" text-anchor="middle">L MCA</text>
+        <text class="label-txt" x="535" y="176" text-anchor="middle">R MCA</text>
+        <text class="label-txt" x="282" y="275" text-anchor="end" fill="#fcd34d">L PComA</text>
+        <text class="label-txt" x="478" y="275" text-anchor="start" fill="#fcd34d">R PComA</text>
+        <text class="label-txt" x="255" y="325" text-anchor="middle">L PCA</text>
+        <text class="label-txt" x="505" y="325" text-anchor="middle">R PCA</text>
+        <text class="label-txt" x="380" y="425" text-anchor="middle" fill="#bae6fd"
+              style="paint-order: stroke; stroke: #0b1220; stroke-width: 4px;">Basilar</text>
+
+        <!-- Particle Layer -->
+        <g id="particles"></g>
+
+        <!-- Occlusion X Marker -->
+        <g id="clot-marker" style="display:none;">
+          <circle r="13" fill="#dc2626" stroke="#fff" stroke-width="2.5" />
+          <path d="M -5 -5 L 5 5 M 5 -5 L -5 5" stroke="#fff" stroke-width="2.5" stroke-linecap="round" />
+        </g>
+
+        <!-- Clickable Hit Targets -->
+        <path class="vessel-hit" data-target="l-ica" d="M 255 255 L 272 215" />
+        <path class="vessel-hit" data-target="r-ica" d="M 505 255 L 488 215" />
+        <path class="vessel-hit" data-target="l-mca" d="M 272 215 C 242 195, 215 188, 182 188" />
+        <path class="vessel-hit" data-target="r-mca" d="M 488 215 C 518 195, 545 188, 578 188" />
+        <path class="vessel-hit" data-target="l-aca" d="M 272 215 C 288 170, 322 145, 355 135 C 355 110, 345 92, 330 78" />
+        <path class="vessel-hit" data-target="r-aca" d="M 488 215 C 472 170, 438 145, 405 135 C 405 110, 415 92, 430 78" />
+        <path class="vessel-hit" data-target="basilar" d="M 380 465 L 380 315" />
+        <path class="vessel-hit" data-target="l-pca" d="M 380 315 C 320 315, 250 328, 185 362" />
+        <path class="vessel-hit" data-target="r-pca" d="M 380 315 C 440 315, 510 328, 575 362" />
+      </svg>
+    </div>
+    <p class="hint">Tip: Click directly on any major artery on the diagram (or use the buttons on the right) to simulate a blockage and watch collateral flow.</p>
+  </div>
+
+  <div class="info-section">
+    <div class="plumbing-bar">
+      <div><span class="tag-ant">Anterior (80%)</span> <strong>ICA Inlet</strong> → splits straight out to <strong>MCA</strong> (lateral) &amp; up/medially to <strong>ACA</strong>.</div>
+      <div style="margin-top:6px;"><span class="tag-post">Posterior (20%)</span> <strong>L + R Vertebral</strong> → merge into <strong>Basilar</strong> (Brainstem/Cerebellum) → split into <strong>L + R PCA</strong>.</div>
+      <div style="margin-top:6px;"><span class="tag-comm">Circle of Willis</span> <strong>AComA</strong> (L↔R ACA) + <strong>PComA</strong> (ICA↔PCA) act as emergency bypass bridges.</div>
+    </div>
+
+    <div class="status-card" id="status-card">
+      <h2 id="status-title">Normal Cerebral Perfusion</h2>
+      <ul id="status-list">
+        <li><strong>80% of blood</strong> enters via the two <strong>Internal Carotid Arteries (ICA)</strong>, immediately feeding <strong>MCA</strong> and <strong>ACA</strong>.</li>
+        <li><strong>20% of blood</strong> enters from the bottom via <strong>Vertebral Arteries</strong>, merges into the <strong>Basilar Artery</strong>, supplies Brainstem/Cerebellum, and exits via <strong>PCA</strong>.</li>
+        <li>Click any artery or press <strong>Embolus → L MCA</strong> to see why clots love the MCA and what happens downstream.</li>
+      </ul>
+    </div>
+
+    <div class="status-card">
+      <h2 style="color:#e2e8f0; font-size:0.95rem;">Simulate Occlusion (Click to Block / Unblock)</h2>
+      <div class="occlusion-btns">
+        <button data-occ="none" class="active">Clear All</button>
+        <button data-occ="l-mca">Block L MCA</button>
+        <button data-occ="r-mca">Block R MCA</button>
+        <button data-occ="l-aca">Block L ACA</button>
+        <button data-occ="l-ica">Block L ICA</button>
+        <button data-occ="l-pca">Block L PCA</button>
+        <button data-occ="basilar">Block Basilar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const svg = document.getElementById('flow-svg');
+  const pGroup = document.getElementById('particles');
+  const clotMarker = document.getElementById('clot-marker');
+  const statusCard = document.getElementById('status-card');
+  const statusTitle = document.getElementById('status-title');
+  const statusList = document.getElementById('status-list');
+
+  let paused = false;
+  let speedMult = 1;
+  let mode = 'normal'; // 'normal' | 'embolus'
+  let occluded = 'none';
+
+  const paths = {
+    lVert: document.getElementById('v-l-vert'),
+    rVert: document.getElementById('v-r-vert'),
+    basilar: document.getElementById('v-basilar'),
+    lPca: document.getElementById('v-l-pca'),
+    rPca: document.getElementById('v-r-pca'),
+    lIca: document.getElementById('v-l-ica'),
+    rIca: document.getElementById('v-r-ica'),
+    lMca: document.getElementById('v-l-mca'),
+    rMca: document.getElementById('v-r-mca'),
+    lAca: document.getElementById('v-l-aca'),
+    rAca: document.getElementById('v-r-aca'),
+    acom: document.getElementById('v-acom'),
+    lPcom: document.getElementById('v-l-pcom'),
+    rPcom: document.getElementById('v-r-pcom'),
+    lPica: document.getElementById('v-l-pica'),
+    rPica: document.getElementById('v-r-pica'),
+    lAica: document.getElementById('v-l-aica'),
+    rAica: document.getElementById('v-r-aica'),
+    lSca: document.getElementById('v-l-sca'),
+    rSca: document.getElementById('v-r-sca'),
+  };
+
+  // Routes: array of { path, reverse?: bool }
+  const ROUTES = [
+    // Anterior Left (40% -> high particle count)
+    { id: 'L_MCA_1', color: '#ef4444', r: 3.6, speed: 0.0068, weight: 5, segs: [{ p: paths.lIca }, { p: paths.lMca }], req: ['l-ica', 'l-mca'] },
+    { id: 'L_ACA_1', color: '#f87171', r: 3.0, speed: 0.0056, weight: 3, segs: [{ p: paths.lIca }, { p: paths.lAca }], req: ['l-ica', 'l-aca'] },
+    // Anterior Right
+    { id: 'R_MCA_1', color: '#ef4444', r: 3.6, speed: 0.0068, weight: 5, segs: [{ p: paths.rIca }, { p: paths.rMca }], req: ['r-ica', 'r-mca'] },
+    { id: 'R_ACA_1', color: '#f87171', r: 3.0, speed: 0.0056, weight: 3, segs: [{ p: paths.rIca }, { p: paths.rAca }], req: ['r-ica', 'r-aca'] },
+    // Posterior Left & Right
+    { id: 'POST_L_PCA', color: '#38bdf8', r: 3.1, speed: 0.0046, weight: 3, segs: [{ p: paths.lVert }, { p: paths.basilar }, { p: paths.lPca }], req: ['basilar', 'l-pca'] },
+    { id: 'POST_R_PCA', color: '#38bdf8', r: 3.1, speed: 0.0046, weight: 3, segs: [{ p: paths.rVert }, { p: paths.basilar }, { p: paths.rPca }], req: ['basilar', 'r-pca'] },
+    // Posterior Fossa branches
+    { id: 'L_PICA', color: '#7dd3fc', r: 2.3, speed: 0.005, weight: 1, segs: [{ p: paths.lVert }, { p: paths.lPica }], req: [] },
+    { id: 'R_PICA', color: '#7dd3fc', r: 2.3, speed: 0.005, weight: 1, segs: [{ p: paths.rVert }, { p: paths.rPica }], req: [] },
+    { id: 'L_AICA', color: '#7dd3fc', r: 2.3, speed: 0.005, weight: 1, segs: [{ p: paths.lVert }, { p: paths.lAica }], req: ['basilar'] },
+    { id: 'R_AICA', color: '#7dd3fc', r: 2.3, speed: 0.005, weight: 1, segs: [{ p: paths.rVert }, { p: paths.rAica }], req: ['basilar'] },
+    { id: 'L_SCA', color: '#7dd3fc', r: 2.4, speed: 0.0048, weight: 1, segs: [{ p: paths.lVert }, { p: paths.basilar }, { p: paths.lSca }], req: ['basilar'] },
+    { id: 'R_SCA', color: '#7dd3fc', r: 2.4, speed: 0.0048, weight: 1, segs: [{ p: paths.rVert }, { p: paths.basilar }, { p: paths.rSca }], req: ['basilar'] },
+    // Normal gentle communicating mix
+    { id: 'ACOM_LR', color: '#fbbf24', r: 2.3, speed: 0.004, weight: 1, segs: [{ p: paths.acom }], req: ['l-ica', 'r-ica'] },
+    { id: 'PCOM_L', color: '#fbbf24', r: 2.3, speed: 0.004, weight: 1, segs: [{ p: paths.lPcom }], req: ['l-ica', 'basilar'] },
+    { id: 'PCOM_R', color: '#fbbf24', r: 2.3, speed: 0.004, weight: 1, segs: [{ p: paths.rPcom }], req: ['r-ica', 'basilar'] },
+  ];
+
+  // Collateral bypass routes activated during specific occlusions
+  const COLLATERALS = [
+    { when: 'l-ica', color: '#fbbf24', r: 3.2, speed: 0.0052, count: 4,
+      segs: [{ p: paths.rIca }, { p: paths.rAca }, { p: paths.acom, rev: true }, { p: paths.lAca }] },
+    { when: 'l-ica', color: '#fbbf24', r: 3.0, speed: 0.0048, count: 3,
+      segs: [{ p: paths.lVert }, { p: paths.basilar }, { p: paths.lPcom, rev: true }, { p: paths.lMca }] },
+    { when: 'basilar', color: '#fbbf24', r: 3.0, speed: 0.0052, count: 4,
+      segs: [{ p: paths.lIca }, { p: paths.lPcom }, { p: paths.lPca }] },
+    { when: 'basilar', color: '#fbbf24', r: 3.0, speed: 0.0052, count: 4,
+      segs: [{ p: paths.rIca }, { p: paths.rPcom }, { p: paths.rPca }] },
+  ];
+
+  const OCCLUSION_INFO = {
+    'none': {
+      title: 'Normal Cerebral Perfusion',
+      alert: false,
+      clot: null,
+      starved: [],
+      bullets: [
+        '<strong>80% of blood</strong> enters via the two <strong>Internal Carotid Arteries (ICA)</strong>, immediately feeding <strong>MCA</strong> and <strong>ACA</strong>.',
+        '<strong>20% of blood</strong> enters from the bottom via <strong>Vertebral Arteries</strong>, merges into the <strong>Basilar Artery</strong>, supplies Brainstem/Cerebellum, and exits via <strong>PCA</strong>.',
+        'Click any artery or press <strong>Embolus → L MCA</strong> to see why clots love the MCA and what happens downstream.'
+      ]
+    },
+    'l-mca': {
+      title: 'Occlusion: Left MCA (Most Common Embolic Stroke)',
+      alert: true,
+      clot: [225, 192],
+      starved: ['terr-l-mca'],
+      bullets: [
+        '<strong>Why here?</strong> High-flow straight path from <strong>L ICA → L MCA</strong> carries most cardiac/carotid emboli.',
+        '<strong>Starved regions:</strong> Lateral <strong>Frontal</strong>, <strong>Parietal</strong>, and <strong>Temporal</strong> lobes.',
+        '<strong>Expected PHTY2030 deficits:</strong> Contralateral (<strong>Right</strong>) face &amp; upper limb weakness/sensory loss, plus <strong>Broca’s / Wernicke’s aphasia</strong> (dominant hemisphere).'
+      ]
+    },
+    'r-mca': {
+      title: 'Occlusion: Right MCA',
+      alert: true,
+      clot: [535, 192],
+      starved: ['terr-r-mca'],
+      bullets: [
+        '<strong>Starved regions:</strong> Right lateral <strong>Frontal</strong>, <strong>Parietal</strong>, and <strong>Temporal</strong> lobes.',
+        '<strong>Expected PHTY2030 deficits:</strong> Contralateral (<strong>Left</strong>) face &amp; upper limb weakness/sensory loss, plus <strong>Unilateral spatial neglect</strong> (right parietal).'
+      ]
+    },
+    'l-aca': {
+      title: 'Occlusion: Left ACA',
+      alert: true,
+      clot: [345, 108],
+      starved: ['terr-l-aca'],
+      bullets: [
+        '<strong>Starved regions:</strong> Medial <strong>Frontal</strong> &amp; <strong>Parietal</strong> lobes.',
+        '<strong>Expected PHTY2030 deficits:</strong> Contralateral (<strong>Right</strong>) <strong>lower limb &amp; foot</strong> weakness/sensory loss (medial homunculus), plus executive/behavioural changes.'
+      ]
+    },
+    'l-ica': {
+      title: 'Occlusion: Left ICA (Circle of Willis Rescue Active!)',
+      alert: true,
+      clot: [263, 236],
+      starved: ['terr-l-mca', 'terr-l-aca'],
+      bullets: [
+        '<strong>Upstream blockage:</strong> Cuts off main inflow to both <strong>L MCA</strong> and <strong>L ACA</strong>.',
+        '<strong>Collateral rescue (amber particles):</strong> Blood reroutes from <strong>R ICA → AComA</strong> and from <strong>Basilar → L PComA</strong> to partially perfuse the left hemisphere!'
+      ]
+    },
+    'l-pca': {
+      title: 'Occlusion: Left PCA',
+      alert: true,
+      clot: [275, 326],
+      starved: ['terr-l-pca'],
+      bullets: [
+        '<strong>Starved regions:</strong> Left <strong>Occipital lobe</strong>, <strong>Thalamus</strong>, and medial <strong>Temporal lobe</strong>.',
+        '<strong>Expected PHTY2030 deficits:</strong> Contralateral (<strong>Right</strong>) <strong>homonymous hemianopia</strong>, contralateral <strong>hemisensory loss</strong>, and memory impairment.'
+      ]
+    },
+    'basilar': {
+      title: 'Occlusion: Basilar Artery (Posterior Circulation)',
+      alert: true,
+      clot: [380, 390],
+      starved: ['terr-post-fossa', 'terr-l-pca', 'terr-r-pca'],
+      bullets: [
+        '<strong>Critical bottleneck:</strong> Blocks flow to <strong>Brainstem</strong>, <strong>Cerebellum</strong>, and both <strong>PCAs</strong>.',
+        '<strong>Expected deficits:</strong> <strong>Cranial nerve palsies</strong> (diplopia, dysphagia, dysarthria), <strong>vertigo</strong>, <strong>nystagmus</strong>, <strong>ataxia</strong>, and altered consciousness.',
+        '<strong>Collateral attempt (amber):</strong> Anterior circulation pushes backward via <strong>PComA</strong> toward the PCAs.'
+      ]
+    }
+  };
+
+  let particles = [];
+
+  function buildParticles() {
+    pGroup.innerHTML = '';
+    particles = [];
+    ROUTES.forEach(route => {
+      if (occluded !== 'none' && route.req.includes(occluded)) return;
+      for (let i = 0; i < route.weight; i++) {
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('r', route.r);
+        c.setAttribute('fill', route.color);
+        pGroup.appendChild(c);
+        particles.push({
+          el: c,
+          segs: route.segs,
+          speed: route.speed,
+          t: i / route.weight
+        });
+      }
+    });
+
+    COLLATERALS.forEach(col => {
+      if (col.when !== occluded) return;
+      for (let i = 0; i < col.count; i++) {
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('r', col.r);
+        c.setAttribute('fill', col.color);
+        pGroup.appendChild(c);
+        particles.push({
+          el: c,
+          segs: col.segs,
+          speed: col.speed,
+          t: i / col.count
+        });
+      }
+    });
+
+    if (mode === 'embolus') {
+      const emb = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      emb.setAttribute('r', 7.5);
+      emb.setAttribute('fill', '#fde047');
+      emb.setAttribute('stroke', '#991b1b');
+      emb.setAttribute('stroke-width', '2.5');
+      pGroup.appendChild(emb);
+      particles.push({
+        el: emb,
+        segs: [{ p: paths.lIca }, { p: paths.lMca }],
+        speed: 0.005,
+        t: 0,
+        isEmbolus: true
+      });
+    }
+  }
+
+  function setOcclusion(target) {
+    occluded = target;
+    document.querySelectorAll('.vessel-base').forEach(v => v.classList.remove('occluded'));
+    document.querySelectorAll('.territory-box').forEach(b => b.classList.remove('starved'));
+    document.querySelectorAll('.occlusion-btns button').forEach(b => {
+      b.classList.toggle('active', b.dataset.occ === target);
+    });
+
+    const info = OCCLUSION_INFO[target];
+    statusTitle.textContent = info.title;
+    statusCard.classList.toggle('alert', info.alert);
+    statusList.innerHTML = info.bullets.map(b => `<li>${b}</li>`).join('');
+
+    if (target !== 'none') {
+      const el = document.querySelector(`[data-key="${target}"]`);
+      if (el) el.classList.add('occluded');
+    }
+    info.starved.forEach(id => {
+      const box = document.querySelector(`#${id} .territory-box`);
+      if (box) box.classList.add('starved');
+    });
+
+    if (info.clot) {
+      clotMarker.style.display = 'block';
+      clotMarker.setAttribute('transform', `translate(${info.clot[0]}, ${info.clot[1]})`);
+    } else {
+      clotMarker.style.display = 'none';
+    }
+    buildParticles();
+  }
+
+  function animate() {
+    if (!paused) {
+      particles.forEach(pt => {
+        pt.t += pt.speed * speedMult;
+        if (pt.t >= 1) pt.t -= 1;
+
+        const segCount = pt.segs.length;
+        const scaled = pt.t * segCount;
+        const idx = Math.min(Math.floor(scaled), segCount - 1);
+        const localT = scaled - idx;
+        const seg = pt.segs[idx];
+        const len = seg.p.getTotalLength();
+        const dist = seg.rev ? len * (1 - localT) : len * localT;
+        const pos = seg.p.getPointAtLength(dist);
+        pt.el.setAttribute('cx', pos.x);
+        pt.el.setAttribute('cy', pos.y);
+      });
+    }
+    requestAnimationFrame(animate);
+  }
+
+  // Controls
+  document.getElementById('btn-normal').addEventListener('click', () => {
+    mode = 'normal';
+    document.getElementById('btn-normal').classList.add('active');
+    document.getElementById('btn-embolus').classList.remove('active');
+    setOcclusion('none');
+  });
+
+  document.getElementById('btn-embolus').addEventListener('click', () => {
+    mode = 'embolus';
+    document.getElementById('btn-embolus').classList.add('active');
+    document.getElementById('btn-normal').classList.remove('active');
+    setOcclusion('l-mca');
+  });
+
+  document.getElementById('btn-pause').addEventListener('click', (e) => {
+    paused = !paused;
+    e.target.textContent = paused ? 'Resume' : 'Pause';
+    e.target.classList.toggle('active', paused);
+  });
+
+  document.getElementById('speed').addEventListener('input', (e) => {
+    speedMult = parseFloat(e.target.value);
+  });
+
+  document.querySelectorAll('.occlusion-btns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      mode = 'normal';
+      document.getElementById('btn-normal').classList.add('active');
+      document.getElementById('btn-embolus').classList.remove('active');
+      setOcclusion(btn.dataset.occ);
+    });
+  });
+
+  document.querySelectorAll('.vessel-hit').forEach(hit => {
+    hit.addEventListener('click', () => {
+      const target = hit.dataset.target;
+      mode = 'normal';
+      document.getElementById('btn-normal').classList.add('active');
+      document.getElementById('btn-embolus').classList.remove('active');
+      setOcclusion(occluded === target ? 'none' : target);
+    });
+  });
+
+  setOcclusion('none');
+  animate();
+})();
+</script>
+</body>
+</html>
